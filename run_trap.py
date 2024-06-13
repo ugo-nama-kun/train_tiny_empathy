@@ -23,7 +23,8 @@ def make_env(enable_empathy, weight_empathy):
                        enable_empathy=enable_empathy,
                        weight_empathy=weight_empathy,
                        render_mode="human",
-                       max_episode_steps=5000)
+                       max_episode_steps=5000,
+                       p_trap=0.0005)
 
         # env = gym.make("tiny_empathy/Trap-v0",
         #                enable_empathy=enable_empathy,
@@ -127,8 +128,13 @@ def unbatchify(x, env):
 
 
 if __name__ == "__main__":
-    model_name = "models/2024-06-12-12-29-48/agent_emp_reward.pt"
-    enable_empathy = False
+    # model_name = "models/2024-06-12-12-29-48/agent_emp_reward.pt"
+    # model_name = "models/2024-06-13-07-15-21/agent_emp_reward.pt"
+    # model_name = "models/2024-06-13-07-14-46/agent_no_empathy.pt"
+    # enable_empathy = False
+
+    model_name = "models/2024-06-13-07-15-55/agent_emp_channel.pt"
+    enable_empathy = True
 
     seed = 10
     run_name = f"{'Trap-v0'}__{seed}__{int(time.time())}"
