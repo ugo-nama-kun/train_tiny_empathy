@@ -482,7 +482,7 @@ if __name__ == "__main__":
     os.makedirs("models", exist_ok=True)
 
     s = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-    os.makedirs(f"models/{s}", exist_ok=True)
+    os.makedirs(f"models/trap-{s}", exist_ok=True)
 
     if args.enable_empathy is True and args.weight_empathy > 0:
         PATH = f"models/{s}/agent_full_empathy.pt"
