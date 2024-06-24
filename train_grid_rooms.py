@@ -436,19 +436,20 @@ if __name__ == "__main__":
 
     envs.close()
 
-    os.makedirs("models_grid", exist_ok=True)
+    os.makedirs("models", exist_ok=True)
+    os.makedirs("models/grid", exist_ok=True)
 
     s = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-    os.makedirs(f"models_grid/grid-{s}", exist_ok=True)
+    os.makedirs(f"models/grid/{s}", exist_ok=True)
 
     if args.enable_empathy is True and args.weight_empathy > 0:
-        PATH = f"models_grid/{s}/agent_full_empathy.pt"
+        PATH = f"models/grid/{s}/agent_full_empathy.pt"
     elif args.enable_empathy is True and args.weight_empathy == 0:
-        PATH = f"models_grid/{s}/agent_emp_channel.pt"
+        PATH = f"models/grid/{s}/agent_emp_channel.pt"
     elif args.enable_empathy is False and args.weight_empathy > 0:
-        PATH = f"models_grid/{s}/agent_emp_reward.pt"
+        PATH = f"models/grid/{s}/agent_emp_reward.pt"
     elif args.enable_empathy is False and args.weight_empathy == 0:
-        PATH = f"models_grid/{s}/agent_no_empathy.pt"
+        PATH = f"models/grid/{s}/agent_no_empathy.pt"
     else:
         raise ValueError(f"invalid setting : {(args.enable_empathy, args.weight_empathy)}")
 
