@@ -199,6 +199,49 @@ def unbatchify(x, env):
     return x
 
 
+def test_runs(agent: torch.nn.Module, test_envs: gym.vector.SyncVectorEnv, device):
+    agent.eval()
+
+    episode_length = 0.0
+    n_runs = len(test_envs.envs)
+
+    not_done_flags = {i: True for i in range(n_runs)}
+
+    next_obs, _ = test_envs.reset(seed=args.seed)
+    next_obs = torch.Tensor(next_obs).to(device)
+    next_done = torch.zeros(args.num_test_envs).to(device)
+    next_lstm_state = (
+        torch.zeros(agent.lstm.num_layers, args.num_test_envs, agent.lstm.hidden_size).to(device),
+        torch.zeros(agent.lstm.num_layers, args.num_test_envs, agent.lstm.hidden_size).to(device),
+    )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
+
+    while np.any(list(not_done_flags.values())):
+
+        with torch.no_grad():
+            action, _, _, _, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state, next_done)
+
+        next_obs, reward, next_done, truncations, infos = test_envs.step(action.cpu().numpy())
+        next_done = np.logical_or(next_done, truncations)
+        next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
+
+        if "final_info" in infos:
+            for id_, info in enumerate(infos["final_info"].tolist()):
+                if info is not None:
+                    if not_done_flags[id_] is True:
+                        not_done_flags[id_] = False
+                        print(f"TEST: episodic_return={info['episode']['r']}, episodic_length={info['episode']['l']}")
+                        episode_length += info['episode']['l']
+
+                if np.any(list(not_done_flags.values())) is False:
+                    break
+
+    episode_length /= float(n_runs)
+
+    agent.train()
+
+    return episode_length
+
+
 if __name__ == "__main__":
     """ALGO PARAMS"""
     args = tyro.cli(Args)
@@ -251,6 +294,7 @@ if __name__ == "__main__":
 
     """ ENV SETUP """
     env = make_env(args.enable_empathy, args.weight_empathy)()
+    test_env = make_env(args.enable_empathy, args.weight_empathy)()
     num_agents = len(env.possible_agents)
     num_actions = env.action_space.n
     observation_size = env.observation_space.shape
@@ -279,6 +323,12 @@ if __name__ == "__main__":
     )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
 
     for iteration in range(1, args.num_iterations + 1):
+        # test
+        test_length = test_runs(agent, test_env, device=device)
+        # writer.add_scalar("test/episodic_error", test_error, global_step)
+        writer.add_scalar("test/episodic_length", test_length, global_step)
+
+        # training
         initial_lstm_state = (next_lstm_state[0].clone(), next_lstm_state[1].clone())
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
@@ -306,9 +356,9 @@ if __name__ == "__main__":
             # print(info)
             # print(f"DONES: {done}")
             if any(done.values()) is True:
-                print(f"global_step={global_step}, episodic_length={info['steps']}")
-                # writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
-                writer.add_scalar("charts/episodic_length", info['steps'], global_step)
+                # print(f"global_step={global_step}, episodic_length={info['steps']}")
+                # # writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
+                # writer.add_scalar("charts/episodic_length", info['steps'], global_step)
 
                 # Reset if done
                 next_obs, _ = env.reset(seed=args.seed)

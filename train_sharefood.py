@@ -42,11 +42,13 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "tiny_empathy/FoodShare-v0"
     """the id of the environment"""
-    total_timesteps: int = 50_000
+    total_timesteps: int = 25_000
     """total timesteps of the experiments"""
     learning_rate: float = 0.001
     """the learning rate of the optimizer"""
     num_envs: int = 16
+    """the number of parallel game environments"""
+    num_test_envs: int = 1
     """the number of parallel game environments"""
     num_steps: int = 32
     """the number of steps to run in each environment per policy rollout"""
@@ -171,6 +173,59 @@ class Agent(nn.Module):
         return action, probs.log_prob(action), probs.entropy(), self.critic(hidden), lstm_state
 
 
+def test_runs(agent: torch.nn.Module, test_envs: gym.vector.SyncVectorEnv, device):
+    agent.eval()
+
+    episode_length = 0.0
+    # episode_error = 0
+
+    n_runs = len(test_envs.envs)
+
+    not_done_flags = {i: True for i in range(n_runs)}
+
+    # intero_errors = np.zeros((n_runs, 2))
+
+    next_obs, _ = test_envs.reset(seed=args.seed)
+    next_obs = torch.Tensor(next_obs).to(device)
+    next_done = torch.zeros(args.num_test_envs).to(device)
+    next_lstm_state = (
+        torch.zeros(agent.lstm.num_layers, args.num_test_envs, agent.lstm.hidden_size).to(device),
+        torch.zeros(agent.lstm.num_layers, args.num_test_envs, agent.lstm.hidden_size).to(device),
+    )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
+
+    while np.any(list(not_done_flags.values())):
+
+        with torch.no_grad():
+            action, _, _, _, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state, next_done)
+
+        next_obs, reward, next_done, truncations, infos = test_envs.step(action.cpu().numpy())
+        next_done = np.logical_or(next_done, truncations)
+        next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
+
+        if "final_info" in infos:
+            for id_, info in enumerate(infos["final_info"].tolist()):
+                if info is not None:
+                    if not_done_flags[id_] is True:
+                        # print(id_)
+                        # print(info)
+                        # print(infos)
+                        not_done_flags[id_] = False
+                        print(f"TEST: episodic_return={info['episode']['r']}, episodic_length={info['episode']['l']}")
+                        episode_length += info['episode']['l']
+                        # episode_error += intero_errors[i] / info['episode']['l'][i]
+                        # intero_errors[i] = 0
+
+                if np.any(list(not_done_flags.values())) is False:
+                    break
+
+    episode_length /= float(n_runs)
+    # episode_error /= n_runs
+
+    agent.train()
+
+    return episode_length
+
+
 if __name__ == "__main__":
     args = tyro.cli(Args)
     args.batch_size = int(args.num_envs * args.num_steps)
@@ -224,6 +279,9 @@ if __name__ == "__main__":
     envs = gym.vector.SyncVectorEnv(
         [make_env(args.env_id, i, args.capture_video, run_name, args.enable_empathy, args.weight_empathy, args.FSR) for i in range(args.num_envs)],
     )
+    test_envs = gym.vector.SyncVectorEnv(
+        [make_env(args.env_id, i, args.capture_video, run_name, args.enable_empathy, args.weight_empathy, args.FSR) for i in range(args.num_test_envs)],
+    )
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
     agent = Agent(envs, args.enable_empathy).to(device)
@@ -249,6 +307,12 @@ if __name__ == "__main__":
     )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
 
     for iteration in range(1, args.num_iterations + 1):
+        # test
+        test_length = test_runs(agent, test_envs, device=device)
+        # writer.add_scalar("test/episodic_error", test_error, global_step)
+        writer.add_scalar("test/episodic_length", test_length, global_step)
+
+        # training
         initial_lstm_state = (next_lstm_state[0].clone(), next_lstm_state[1].clone())
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
@@ -274,12 +338,12 @@ if __name__ == "__main__":
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
 
-            if "final_info" in infos:
-                for info in infos["final_info"]:
-                    if info and "episode" in info:
-                        print(f"global_step={global_step}, episodic_return={info['episode']['r']}, episodic_length={info['episode']['l']}")
-                        writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
-                        writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+            # if "final_info" in infos:
+            #     for info in infos["final_info"]:
+            #         if info and "episode" in info:
+            #             print(f"global_step={global_step}, episodic_return={info['episode']['r']}, episodic_length={info['episode']['l']}")
+            #             writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
+            #             writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
 
         # bootstrap value if not done
         with torch.no_grad():
