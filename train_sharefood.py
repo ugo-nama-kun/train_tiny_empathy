@@ -30,8 +30,10 @@ class Args:
     """if toggled, cuda will be enabled by default"""
     track: bool = False
     """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "cleanRL"
+    wandb_project_name: str = "empathy_hrl"
     """the wandb's project name"""
+    wandb_group_name: str = "sharefood"
+    """the wandb's group name"""
     wandb_entity: str = None
     """the entity (team) of wandb's project"""
     capture_video: bool = False
@@ -40,7 +42,7 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "tiny_empathy/FoodShare-v0"
     """the id of the environment"""
-    total_timesteps: int = 100_000
+    total_timesteps: int = 50_000
     """total timesteps of the experiments"""
     learning_rate: float = 0.001
     """the learning rate of the optimizer"""
@@ -178,12 +180,16 @@ if __name__ == "__main__":
     s = f"fsr_{args.FSR}_weight_{args.weight_empathy}_"
     if args.enable_empathy is True and args.weight_empathy > 0:
         s += "full_empathy"
+        args.wandb_group_name += "/full_emp"
     elif args.enable_empathy is True and args.weight_empathy == 0:
         s += "emp_channel"
+        args.wandb_group_name += "/channel_emp"
     elif args.enable_empathy is False and args.weight_empathy > 0:
         s += "emp_reward"
+        args.wandb_group_name += "/reward_emp"
     elif args.enable_empathy is False and args.weight_empathy == 0:
         s += "no_empathy"
+        args.wandb_group_name += "/no_emp"
 
     run_name = f"{args.env_id}__{args.exp_name}_{s}_{args.seed}__{int(time.time())}"
 
@@ -193,6 +199,7 @@ if __name__ == "__main__":
         wandb.init(
             project=args.wandb_project_name,
             entity=args.wandb_entity,
+            group=args.wandb_group_name,
             sync_tensorboard=True,
             config=vars(args),
             name=run_name,
