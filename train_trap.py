@@ -480,19 +480,21 @@ if __name__ == "__main__":
     env.close()
 
     os.makedirs("models", exist_ok=True)
-    os.makedirs("models/trap", exist_ok=True)
-
     s = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-    os.makedirs(f"models/trap/{s}", exist_ok=True)
-
+    p = f"models/{args.env_id.split('/')[1]}"
+    os.makedirs(p, exist_ok=True)
     if args.enable_empathy is True and args.weight_empathy > 0:
-        PATH = f"models/trap/{s}/agent_full_empathy.pt"
+        os.makedirs(p + f"/full", exist_ok=True)
+        PATH = p + f"/full/full-{s}.pt"
     elif args.enable_empathy is True and args.weight_empathy == 0:
-        PATH = f"models/trap/{s}/agent_emp_channel.pt"
+        os.makedirs(p + f"/channel", exist_ok=True)
+        PATH = p + f"/channel/channel-{s}.pt"
     elif args.enable_empathy is False and args.weight_empathy > 0:
-        PATH = f"models/trap/{s}/agent_emp_reward.pt"
+        os.makedirs(p + f"/reward", exist_ok=True)
+        PATH = p + f"/reward/reward-{s}.pt"
     elif args.enable_empathy is False and args.weight_empathy == 0:
-        PATH = f"models/trap/{s}/agent_no_empathy.pt"
+        os.makedirs(p + f"/no", exist_ok=True)
+        PATH = p + f"/no/no-{s}.pt"
     else:
         raise ValueError(f"invalid setting : {(args.enable_empathy, args.weight_empathy)}")
 
