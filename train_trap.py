@@ -47,13 +47,13 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "tiny_empathy/Trap-v0"
     """the id of the environment"""
-    total_timesteps: int = 50_000_000
+    total_timesteps: int = 30_000_000
     """total timesteps of the experiments"""
     learning_rate: float = 0.0003
     """the learning rate of the optimizer"""
     num_steps: int = 32 * 32
     """the number of steps to run in each environment per policy rollout"""
-    anneal_lr: bool = True
+    anneal_lr: bool = False
     """Toggle learning rate annealing for policy and value networks"""
     gamma: float = 0.99
     """the discount factor gamma"""
@@ -205,16 +205,16 @@ def test_runs(agent: torch.nn.Module, test_envs, device):
     episode_length = 0.0
     n_runs = 1
 
-    next_obs, _ = test_envs.reset()
-    next_obs = batchify_obs(next_obs, device)
-    next_done = torch.zeros(2).to(device)
-    next_lstm_state = (
-        torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
-        torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
-    )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
-
     for n in range(n_runs):
         steps = 0.0
+        next_obs, _ = test_envs.reset()
+        next_obs = batchify_obs(next_obs, device)
+        next_done = torch.zeros(2).to(device)
+        next_lstm_state = (
+            torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
+            torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
+        )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
+
         while True:
             steps += 1
 
