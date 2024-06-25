@@ -47,13 +47,13 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "tiny_empathy/Trap-v0"
     """the id of the environment"""
-    total_timesteps: int = 50_000_000
+    total_timesteps: int = 30_000_000
     """total timesteps of the experiments"""
     learning_rate: float = 0.0003
     """the learning rate of the optimizer"""
     num_steps: int = 32 * 32
     """the number of steps to run in each environment per policy rollout"""
-    anneal_lr: bool = True
+    anneal_lr: bool = False
     """Toggle learning rate annealing for policy and value networks"""
     gamma: float = 0.99
     """the discount factor gamma"""
