@@ -205,16 +205,16 @@ def test_runs(agent: torch.nn.Module, test_envs, device):
     episode_length = 0.0
     n_runs = 1
 
-    next_obs, _ = test_envs.reset()
-    next_obs = batchify_obs(next_obs, device)
-    next_done = torch.zeros(2).to(device)
-    next_lstm_state = (
-        torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
-        torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
-    )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
-
     for n in range(n_runs):
         steps = 0.0
+        next_obs, _ = test_envs.reset()
+        next_obs = batchify_obs(next_obs, device)
+        next_done = torch.zeros(2).to(device)
+        next_lstm_state = (
+            torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
+            torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
+        )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
+
         while True:
             steps += 1
 
