@@ -216,8 +216,6 @@ def test_runs(agent: torch.nn.Module, test_envs, device):
         )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
 
         while True:
-            steps += 1
-
             with torch.no_grad():
                 action, _, _, _, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state, next_done)
 
