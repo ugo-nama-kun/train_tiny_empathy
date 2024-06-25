@@ -199,46 +199,40 @@ def unbatchify(x, env):
     return x
 
 
-def test_runs(agent: torch.nn.Module, test_envs: gym.vector.SyncVectorEnv, device):
+def test_runs(agent: torch.nn.Module, test_envs, device):
     agent.eval()
 
     episode_length = 0.0
-    n_runs = len(test_envs.envs)
+    n_runs = 1
 
-    not_done_flags = {i: True for i in range(n_runs)}
-
-    next_obs, _ = test_envs.reset(seed=args.seed)
-    next_obs = torch.Tensor(next_obs).to(device)
-    next_done = torch.zeros(args.num_test_envs).to(device)
+    next_obs, _ = test_envs.reset()
+    next_obs = batchify_obs(next_obs, device)
+    next_done = torch.zeros(2).to(device)
     next_lstm_state = (
-        torch.zeros(agent.lstm.num_layers, args.num_test_envs, agent.lstm.hidden_size).to(device),
-        torch.zeros(agent.lstm.num_layers, args.num_test_envs, agent.lstm.hidden_size).to(device),
+        torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
+        torch.zeros(agent.lstm.num_layers, 2, agent.lstm.hidden_size).to(device),
     )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
 
-    while np.any(list(not_done_flags.values())):
+    for n in range(n_runs):
+        steps = 0.0
+        while True:
+            steps += 1
 
-        with torch.no_grad():
-            action, _, _, _, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state, next_done)
+            with torch.no_grad():
+                action, _, _, _, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state, next_done)
 
-        next_obs, reward, next_done, truncations, infos = test_envs.step(action.cpu().numpy())
-        next_done = np.logical_or(next_done, truncations)
-        next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
+            next_obs, reward, done, _, info = test_envs.step(unbatchify(action, test_envs))
+            next_obs, next_done = batchify_obs(next_obs, device), batchify(done, device)
 
-        if "final_info" in infos:
-            for id_, info in enumerate(infos["final_info"].tolist()):
-                if info is not None:
-                    if not_done_flags[id_] is True:
-                        not_done_flags[id_] = False
-                        print(f"TEST: episodic_return={info['episode']['r']}, episodic_length={info['episode']['l']}")
-                        episode_length += info['episode']['l']
-
-                if np.any(list(not_done_flags.values())) is False:
-                    break
+            steps += 1
+            if any(done.values()) is True:
+                print(f"TEST: episodic_length={steps}")
+                episode_length += steps
+                break
 
     episode_length /= float(n_runs)
 
     agent.train()
-
     return episode_length
 
 
