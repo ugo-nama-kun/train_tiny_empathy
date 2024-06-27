@@ -47,7 +47,7 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "tiny_empathy/Trap-v0"
     """the id of the environment"""
-    total_timesteps: int = 10_000_000
+    total_timesteps: int = 20_000_000
     """total timesteps of the experiments"""
     learning_rate: float = 0.001
     """the learning rate of the optimizer"""
