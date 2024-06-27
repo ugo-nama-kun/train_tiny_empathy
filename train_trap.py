@@ -37,7 +37,7 @@ class Args:
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "empathy_hrl"
     """the wandb's project name"""
-    wandb_group_name: str = "trap"
+    wandb_group_name: str = "Trap-v0"
     """the wandb's group name"""
     wandb_entity: str = None
     """the entity (team) of wandb's project"""
