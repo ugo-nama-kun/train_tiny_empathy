@@ -1,6 +1,7 @@
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/ppo/#ppo_atari_lstmpy
 import os
 import random
+from copy import deepcopy
 
 import gymnasium as gym
 import tiny_empathy
@@ -87,7 +88,7 @@ class Agent(nn.Module):
 
 if __name__ == "__main__":
     experiment = "GridRooms-v0"
-    n_samples = 10
+    n_samples = 1
     max_time_steps = 2_000
 
     model_types = ["no", "channel", "reward", "full"]
@@ -109,17 +110,17 @@ if __name__ == "__main__":
     # data file: (n_types, n_models, n_samples, time_steps) matrix
     tmp = {n: np.zeros((n_samples, max_time_steps)).tolist() for n in range(len(model_files[model_types[0]]))}
     tmp2 = {
-        "possessor_energy": tmp.copy(),
-        "action": tmp.copy(),
-        "have_food": tmp.copy(),
-        "position": tmp.copy(),
-        "partner_energy": tmp.copy(),
+        "possessor_energy": deepcopy(tmp),
+        "action": deepcopy(tmp),
+        "have_food": deepcopy(tmp),
+        "position": deepcopy(tmp),
+        "partner_energy": deepcopy(tmp),
     }
     data = {
-        "no": tmp2.copy(),
-        "channel": tmp2.copy(),
-        "reward": tmp2.copy(),
-        "full": tmp2.copy(),
+        "no": deepcopy(tmp2),
+        "channel": deepcopy(tmp2),
+        "reward": deepcopy(tmp2),
+        "full": deepcopy(tmp2),
     }
     # get data by data["no"]["action"][n_sample][time_step]
 

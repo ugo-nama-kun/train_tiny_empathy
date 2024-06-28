@@ -128,15 +128,14 @@ def unbatchify(x, env):
 
 
 if __name__ == "__main__":
-    # model_name = "models/2024-06-12-12-29-48/agent_emp_reward.pt"
-    # model_name = "models/2024-06-13-07-15-21/agent_emp_reward.pt"
-    # model_name = "models/2024-06-13-07-14-46/agent_no_empathy.pt"
-    # enable_empathy = False
+    model_name = "data/Trap-v0/models/reward/reward-2024-06-28-12-40-32.pt"
+    enable_empathy = False
 
-    model_name = "models/2024-06-13-07-15-55/agent_emp_channel.pt"
-    enable_empathy = True
+    # model_name = "data/Trap-v0/models/full/full-2024-06-28-12-43-49.pt"
+    # model_name = "data/Trap-v0/models/channel/channel-2024-06-28-10-48-52.pt"
+    # enable_empathy = True
 
-    seed = 10
+    seed = np.random.randint(2 ** 32)
     run_name = f"{'Trap-v0'}__{seed}__{int(time.time())}"
     capture_video = False
 
@@ -156,7 +155,7 @@ if __name__ == "__main__":
     observation_size = env.observation_space.shape
 
     agent = Agent(num_actions=num_actions, with_empathy_channel=enable_empathy).to(device)
-    agent.load_state_dict(torch.load(model_name))
+    agent.load_state_dict(torch.load(model_name, map_location=torch.device('cpu')))
     agent.eval()
 
     global_step = 0
