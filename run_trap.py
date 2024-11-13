@@ -128,12 +128,12 @@ def unbatchify(x, env):
 
 
 if __name__ == "__main__":
-    model_name = "data/Trap-v0/models/reward/reward-2024-06-28-12-40-32.pt"
-    enable_empathy = False
+    # model_name = "data/Trap-v0/models/reward/reward-2024-06-28-12-40-32.pt"
+    # enable_empathy = False
 
     # model_name = "data/Trap-v0/models/full/full-2024-06-28-12-43-49.pt"
-    # model_name = "data/Trap-v0/models/channel/channel-2024-06-28-10-48-52.pt"
-    # enable_empathy = True
+    model_name = "data/Trap-v0/models/channel/channel-2024-06-28-10-48-52.pt"
+    enable_empathy = True
 
     seed = np.random.randint(2 ** 32)
     run_name = f"{'Trap-v0'}__{seed}__{int(time.time())}"
@@ -156,7 +156,7 @@ if __name__ == "__main__":
 
     agent = Agent(num_actions=num_actions, with_empathy_channel=enable_empathy).to(device)
     agent.load_state_dict(torch.load(model_name, map_location=torch.device('cpu')))
-    agent.eval()
+    # agent.eval()
 
     global_step = 0
     start_time = time.time()
