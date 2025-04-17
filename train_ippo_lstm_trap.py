@@ -31,7 +31,7 @@ class Args:
     """if toggled, cuda will be enabled by default"""
     track: bool = False
     """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "cleanRL"
+    wandb_project_name: str = "empathy_hrl"
     """the wandb's project name"""
     wandb_entity: str = None
     """the entity (team) of wandb's project"""
@@ -83,10 +83,21 @@ class Args:
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
 
-    cognitive_empathy: bool = False
-    """enabling cognitive empathy (other's interoception as observation)"""
-    weight_affective_empathy: float = 0.0
-    """enabling affective empathy (other's interoceptive drive)"""
+    if wandb_group == "no":
+        cognitive_empathy: bool = False
+        """enabling cognitive empathy (other's interoception as observation)"""
+        weight_affective_empathy: float = 0.0
+        """enabling affective empathy (other's interoceptive drive)"""
+    elif wandb_group == "cognitive":
+        cognitive_empathy: bool = True
+        weight_affective_empathy: float = 0.0
+    elif wandb_group == "affective":
+        cognitive_empathy: bool = False
+        weight_affective_empathy: float = 0.5
+    elif wandb_group == "full":
+        cognitive_empathy: bool = True
+        weight_affective_empathy: float = 0.5
+    wandb_group = f"trap_ippo/{wandb_group}"
 
     save_every: int = 10
     test_every: int = 5
