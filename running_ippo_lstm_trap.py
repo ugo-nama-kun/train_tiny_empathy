@@ -97,8 +97,8 @@ class Args:
 def make_env(cognitive_empathy, weight_affective_empathy):
     def thunk():
         env = TrapEnvPZ(render_mode="human",
-                        enable_empathy=cognitive_empathy,
-                        weight_empathy=weight_affective_empathy,
+                        cognitive_empathy=cognitive_empathy,
+                        weight_affective_empathy=weight_affective_empathy,
         )
         env = RecordParallelEpisodeStatistics(env)
         return env
