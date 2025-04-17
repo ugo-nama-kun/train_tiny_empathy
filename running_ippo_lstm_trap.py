@@ -42,13 +42,13 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "TrapPZ"
     """the id of the environment"""
-    total_timesteps: int = 1_000_000
+    total_timesteps: int = 20_000_000
     """total timesteps of the experiments"""
-    learning_rate: float = 3e-4
+    learning_rate: float = 0.001
     """the learning rate of the optimizer"""
     num_envs: int = 16
     """the number of parallel game environments"""
-    num_steps: int = 1000
+    num_steps: int = 1024
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
@@ -56,9 +56,9 @@ class Args:
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
-    num_minibatches: int = 4
+    num_minibatches: int = 2
     """the number of mini-batches"""
-    update_epochs: int = 6
+    update_epochs: int = 4
     """the K epochs to update the policy"""
     norm_adv: bool = True
     """Toggles advantages normalization"""
@@ -68,9 +68,9 @@ class Args:
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
     ent_coef: float = 0.0
     """coefficient of the entropy"""
-    vf_coef: float = 0.5
+    vf_coef: float = 0.3
     """coefficient of the value function"""
-    max_grad_norm: float = 0.3
+    max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
     target_kl: float = None
     """the target KL divergence threshold"""
