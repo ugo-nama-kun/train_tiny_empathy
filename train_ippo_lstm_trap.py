@@ -147,6 +147,7 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
+    torch.set_num_threads(4)
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
