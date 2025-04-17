@@ -33,7 +33,7 @@ class Args:
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "empathy_hrl"
     """the wandb's project name"""
-    wandb_entity: str = None
+    wandb_entity: str = "ugo-nama-kun"
     """the entity (team) of wandb's project"""
     wandb_group: str = "no"
     capture_video: bool = False
