@@ -83,22 +83,6 @@ class Args:
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
 
-    if wandb_group == "no":
-        cognitive_empathy: bool = False
-        """enabling cognitive empathy (other's interoception as observation)"""
-        weight_affective_empathy: float = 0.0
-        """enabling affective empathy (other's interoceptive drive)"""
-    elif wandb_group == "cognitive":
-        cognitive_empathy: bool = True
-        weight_affective_empathy: float = 0.0
-    elif wandb_group == "affective":
-        cognitive_empathy: bool = False
-        weight_affective_empathy: float = 0.5
-    elif wandb_group == "full":
-        cognitive_empathy: bool = True
-        weight_affective_empathy: float = 0.5
-    wandb_group = f"trap_ippo/{wandb_group}"
-
     save_every: int = 10
     test_every: int = 5
     # TODO: Update to use different number of tests from training run
@@ -123,6 +107,23 @@ if __name__ == "__main__":
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
     run_name = f"{args.env_id}__{args.exp_name}__{args.wandb_group}__{args.seed}__{int(time.time())}"
+
+    if args.wandb_group == "no":
+        args.cognitive_empathy = False
+        """enabling cognitive empathy (other's interoception as observation)"""
+        args.weight_affective_empathy = 0.0
+        """enabling affective empathy (other's interoceptive drive)"""
+    if args.wandb_group == "cognitive":
+        args.cognitive_empathy = True
+        args.weight_affective_empathy = 0.0
+    elif args.wandb_group == "affective":
+        args.cognitive_empathy = False
+        args.weight_affective_empathy = 0.5
+    elif args.wandb_group == "full":
+        args.cognitive_empathy = True
+        args.weight_affective_empathy = 0.5
+    args.wandb_group = f"trap_ippo/{args.wandb_group}"
+
     if args.track:
         import wandb
 
