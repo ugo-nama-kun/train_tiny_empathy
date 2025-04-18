@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import tyro
 
-from tiny_empathy.envs import TrapEnvPZ
+from tiny_empathy.envs import DoubleFoodShareEnvPZ
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -40,15 +40,15 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "TrapPZ"
+    env_id: str = "DoubleFoodShare"
     """the id of the environment"""
-    total_timesteps: int = 40_000_000
+    total_timesteps: int = 1_000_000
     """total timesteps of the experiments"""
     learning_rate: float = 0.001
     """the learning rate of the optimizer"""
     num_envs: int = 16
     """the number of parallel game environments"""
-    num_steps: int = 1024
+    num_steps: int = 100
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
@@ -56,7 +56,7 @@ class Args:
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
-    num_minibatches: int = 2
+    num_minibatches: int = 4
     """the number of mini-batches"""
     update_epochs: int = 4
     """the K epochs to update the policy"""
@@ -66,9 +66,9 @@ class Args:
     """the surrogate clipping coefficient"""
     clip_vloss: bool = True
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.0
+    ent_coef: float = 0.001
     """coefficient of the entropy"""
-    vf_coef: float = 0.3
+    vf_coef: float = 0.5
     """coefficient of the value function"""
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
@@ -91,9 +91,9 @@ class Args:
 
 def make_env(cognitive_empathy, weight_affective_empathy):
     def thunk():
-        env = TrapEnvPZ(render_mode="human",
-                        cognitive_empathy=cognitive_empathy,
-                        weight_affective_empathy=weight_affective_empathy,
+        env = DoubleFoodShareEnvPZ(render_mode="human",
+                                   cognitive_empathy=cognitive_empathy,
+                                   weight_affective_empathy=weight_affective_empathy,
         )
         env = RecordParallelEpisodeStatistics(env)
         return env
