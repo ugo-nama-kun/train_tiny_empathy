@@ -242,6 +242,17 @@ if __name__ == "__main__":
 
     run_name = f"{args.env_id}__{args.exp_name}_{s}_{args.seed}__{int(time.time())}"
 
+    # encoder and decoder settings
+    enc = np.random.randn(args.dim_emotional_feature)
+    enc = enc / np.linalg.norm(enc)  # normalized feature
+
+    dec = np.random.randn(args.dim_emotional_feature)
+    dec = dec / np.linalg.norm(dec)  # normalized feature
+
+    print(f"cosine similarity {args.seed}: ", np.dot(enc, dec))
+    args.cos_sim = np.dot(enc, dec)
+
+
     if args.track:
         import wandb
 
@@ -270,14 +281,8 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    # encoder and decoder settings
-    enc = np.random.randn(args.dim_emotional_feature)
-    args.enc = enc / np.linalg.norm(enc)  # normalized feature
-
-    dec = np.random.randn(args.dim_emotional_feature)
-    args.dec = dec / np.linalg.norm(dec)  # normalized feature
-
-    print(f"cosine similarity {args.seed}: ", np.dot(args.enc, args.dec))
+    args.enc = enc
+    args.dec = dec
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
