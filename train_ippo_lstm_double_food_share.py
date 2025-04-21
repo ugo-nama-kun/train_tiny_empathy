@@ -52,7 +52,7 @@ class Args:
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
-    gamma: float = 0.99
+    gamma: float = 0.95
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
@@ -66,7 +66,7 @@ class Args:
     """the surrogate clipping coefficient"""
     clip_vloss: bool = True
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.001
+    ent_coef: float = 0.0
     """coefficient of the entropy"""
     vf_coef: float = 0.5
     """coefficient of the value function"""
@@ -83,7 +83,7 @@ class Args:
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
 
-    save_every: int = 10
+    save_every: int = 1000
     test_every: int = 5
     # TODO: Update to use different number of tests from training run
     num_tests: int = num_envs
