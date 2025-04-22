@@ -76,11 +76,12 @@ class Args:
     target_kl: float = None
     """the target KL divergence threshold"""
 
-    grid_size: int = 5
     enable_empathy: bool = False
     """cognitive empathy (emotional feature is added when inference mode)"""
     weight_empathy: float = 0.5
     """affective empathy (enable weight empathy by default)"""
+    enable_inference: bool = False
+    grid_size: int = 5
     dim_emotional_feature: int = 3
     energy_loss_partner: float = 0.003
     """default energy loss of the partner; default value = 0.003"""
@@ -99,15 +100,20 @@ def make_env(args, idx, capture_video, run_name):
         if capture_video and idx == 0:
             env = gym.make(args.env_id,
                            render_mode="rgb_array",
-                           )
+                           encoder_weight=args.enc,
+                           decoder_weight=args.dec,
+                           enable_inference=args.enable_inference,
+                           enable_empathy=args.enable_empathy,
+                           weight_empathy=args.weight_empathy)
             env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
         else:
             env = gym.make(args.env_id,
-                           size=args.grid_size,
-                           enable_inference=True,
+                           size=5,
                            encoder_weight=args.enc,
                            decoder_weight=args.dec,
-                           set_energy_loss_partner=args.energy_loss_partner)
+                           enable_inference=args.enable_inference,
+                           enable_empathy=args.enable_empathy,
+                           weight_empathy=args.weight_empathy)
 
         env = GridRoomsWrapper(env)
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -129,17 +135,17 @@ class Agent(nn.Module):
         x_in = envs.single_observation_space.shape[0]
 
         self.network = nn.Sequential(
-            layer_init(nn.Linear(x_in, 64)),
+            layer_init(nn.Linear(x_in, 32)),
             nn.ReLU(),
         )
-        self.lstm = nn.LSTM(64, 64)
+        self.lstm = nn.LSTM(32, 32)
         for name, param in self.lstm.named_parameters():
             if "bias" in name:
                 nn.init.constant_(param, 0)
             elif "weight" in name:
                 nn.init.orthogonal_(param, 1.0)
-        self.actor = layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01)
-        self.critic = layer_init(nn.Linear(64, 1), std=1)
+        self.actor = layer_init(nn.Linear(32, envs.single_action_space.n), std=0.01)
+        self.critic = layer_init(nn.Linear(32, 1), std=1)
 
     def get_states(self, x, lstm_state, done):
         hidden = self.network(x)
@@ -252,7 +258,6 @@ if __name__ == "__main__":
     print(f"cosine similarity {args.seed}: ", np.dot(enc, dec))
     args.cos_sim = np.dot(enc, dec)
 
-
     if args.track:
         import wandb
 
@@ -333,6 +338,7 @@ if __name__ == "__main__":
             global_step += args.num_envs
             obs[step] = next_obs
             dones[step] = next_done
+            print(next_obs[0])
 
             # ALGO LOGIC: action logic
             with torch.no_grad():

@@ -1,5 +1,5 @@
 
-for i in `seq 1 100`
+for i in `seq 1 10`
 do
   python train_grid_rooms_inference_analysis.py --track --enable-empathy &
   python train_grid_rooms_inference_analysis.py --track &
