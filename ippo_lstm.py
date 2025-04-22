@@ -75,7 +75,7 @@ class PPO_LSTM:
         self.model = Model(self.single_action_space, self.single_observation_space).to(device)
 
         if not test:
-            self.optimizer = optim.AdamW(self.model.parameters(), lr=args.learning_rate, eps=1e-5)
+            self.optimizer = optim.Adam(self.model.parameters(), lr=args.learning_rate, eps=1e-5)
 
             # ALGO Logic: Storage setup
             self.obs = torch.zeros((args.num_steps, args.num_envs) + self.single_observation_space.shape).to(device)

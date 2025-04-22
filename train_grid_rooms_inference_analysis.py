@@ -76,7 +76,7 @@ class Args:
     target_kl: float = None
     """the target KL divergence threshold"""
 
-    grid_size: int = 2
+    grid_size: int = 5
     enable_empathy: bool = False
     """cognitive empathy (emotional feature is added when inference mode)"""
     weight_empathy: float = 0.5
@@ -129,17 +129,17 @@ class Agent(nn.Module):
         x_in = envs.single_observation_space.shape[0]
 
         self.network = nn.Sequential(
-            layer_init(nn.Linear(x_in, 32)),
+            layer_init(nn.Linear(x_in, 64)),
             nn.ReLU(),
         )
-        self.lstm = nn.LSTM(32, 32)
+        self.lstm = nn.LSTM(64, 64)
         for name, param in self.lstm.named_parameters():
             if "bias" in name:
                 nn.init.constant_(param, 0)
             elif "weight" in name:
                 nn.init.orthogonal_(param, 1.0)
-        self.actor = layer_init(nn.Linear(32, envs.single_action_space.n), std=0.01)
-        self.critic = layer_init(nn.Linear(32, 1), std=1)
+        self.actor = layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01)
+        self.critic = layer_init(nn.Linear(64, 1), std=1)
 
     def get_states(self, x, lstm_state, done):
         hidden = self.network(x)
