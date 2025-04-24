@@ -7,13 +7,11 @@ from datetime import datetime
 
 import gymnasium as gym
 import tiny_empathy
-
-from tiny_empathy.envs import FoodShareDecoderLearningEnv
+from tiny_empathy.envs import GridRoomsDecoderLearningEnv
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.functional as F
 import torch.optim as optim
 import tyro
 from torch.distributions.categorical import Categorical
@@ -27,7 +25,7 @@ from wrapper import RecordEpisodeStatisticsDecoderLearning
 class Args:
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
-    seed: int = np.random.randint(2 ** 32)
+    seed: int = np.random.randint(2**32)
     """seed of the experiment"""
     torch_deterministic: bool = True
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
@@ -37,7 +35,7 @@ class Args:
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "empathy_hrl"
     """the wandb's project name"""
-    wandb_group_name: str = "FoodShareDecoderLearning"
+    wandb_group_name: str = "GridRooms-v0"
     """the wandb's group name"""
     wandb_entity: str = None
     """the entity (team) of wandb's project"""
@@ -45,17 +43,16 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "tiny_empathy/FoodShare-v0"
+    env_id: str = "tiny_empathy/GridRooms-v0"
     """the id of the environment"""
-    total_timesteps: int = 100_000
+    total_timesteps: int = 1_000_000
     """total timesteps of the experiments"""
     learning_rate: float = 0.001
     """the learning rate of the optimizer"""
     num_envs: int = 16
-    """the number of parallel game environments"""
     num_test_envs: int = 1
     """the number of parallel game environments"""
-    num_steps: int = 32
+    num_steps: int = 100
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = False
     """Toggle learning rate annealing for policy and value networks"""
@@ -91,8 +88,6 @@ class Args:
     dim_emotional_feature: int = 5
     hidden_size_decoder: int = 20
 
-    FSR: float = 1.0  # feed success rate
-
     # to be filled in runtime
     batch_size: int = 0
     """the batch size (computed in runtime)"""
@@ -104,7 +99,7 @@ class Args:
 
 def make_env(args, enc):
     def thunk():
-        env = FoodShareDecoderLearningEnv(
+        env = GridRoomsDecoderLearningEnv(
             decoding_mode=args.decoding_mode,
             dim_emotional_feature=args.dim_emotional_feature,
             emotional_encoder=enc,
@@ -300,7 +295,6 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
-    torch.set_num_threads(3)
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
@@ -352,19 +346,16 @@ if __name__ == "__main__":
             global_step += args.num_envs
             obs[step] = next_obs
             dones[step] = next_done
-            # print(next_obs[0])
 
             # ALGO LOGIC: action logic
             with torch.no_grad():
-                action, logprob, _, value, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state,
-                                                                                        next_done)
+                action, logprob, _, value, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state, next_done)
                 values[step] = value.flatten()
             actions[step] = action
             logprobs[step] = logprob
 
             # TRY NOT TO MODIFY: execute the game and log data.
-            with torch.no_grad():
-                next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy(), emotional_decoder=dec)
+            next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy(), emotional_decoder=dec)
             next_done = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
@@ -516,5 +507,6 @@ if __name__ == "__main__":
     torch.save(enc, PATH + "/emotional_encoder.pt")
     torch.save(dec, PATH + "/emotional_decoder.pt")
     torch.save(agent.state_dict(), PATH + "/model.pt")
+
 
     writer.close()
