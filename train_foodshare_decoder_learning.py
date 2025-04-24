@@ -7,22 +7,27 @@ from datetime import datetime
 
 import gymnasium as gym
 import tiny_empathy
-from tiny_empathy.wrappers import GridRoomsWrapper
+
+from tiny_empathy.envs import FoodShareDecoderLearningEnv
 
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.functional as F
 import torch.optim as optim
 import tyro
 from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
+
+from utils import SyncVectorDecoderLearningEnv
+from wrapper import RecordEpisodeStatisticsDecoderLearning
 
 
 @dataclass
 class Args:
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
-    seed: int = np.random.randint(2**32)
+    seed: int = np.random.randint(2 ** 32)
     """seed of the experiment"""
     torch_deterministic: bool = True
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
@@ -32,7 +37,7 @@ class Args:
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "empathy_hrl"
     """the wandb's project name"""
-    wandb_group_name: str = "GridRooms-v0"
+    wandb_group_name: str = "FoodShareDecoderLearning"
     """the wandb's group name"""
     wandb_entity: str = None
     """the entity (team) of wandb's project"""
@@ -40,16 +45,17 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "tiny_empathy/GridRooms-v0"
+    env_id: str = "tiny_empathy/FoodShare-v0"
     """the id of the environment"""
-    total_timesteps: int = 500_000
+    total_timesteps: int = 100_000
     """total timesteps of the experiments"""
     learning_rate: float = 0.001
     """the learning rate of the optimizer"""
     num_envs: int = 16
+    """the number of parallel game environments"""
     num_test_envs: int = 1
     """the number of parallel game environments"""
-    num_steps: int = 100
+    num_steps: int = 32
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = False
     """Toggle learning rate annealing for policy and value networks"""
@@ -76,15 +82,16 @@ class Args:
     target_kl: float = None
     """the target KL divergence threshold"""
 
-    enable_empathy: bool = False
-    """cognitive empathy (emotional feature is added when inference mode)"""
+    enable_learning: bool = False
+    "if toggled, enable decoder learning"
+    decoding_mode: str = "affect"
+    """ decoding mode; full or affect"""
     weight_empathy: float = 0.5
-    """affective empathy (enable weight empathy by default)"""
-    enable_inference: bool = False
-    grid_size: int = 5
-    dim_emotional_feature: int = 3
-    energy_loss_partner: float = 0.003
-    """default energy loss of the partner; default value = 0.003"""
+    """ affective empathy weight """
+    dim_emotional_feature: int = 5
+    hidden_size_decoder: int = 20
+
+    FSR: float = 1.0  # feed success rate
 
     # to be filled in runtime
     batch_size: int = 0
@@ -95,28 +102,15 @@ class Args:
     """the number of iterations (computed in runtime)"""
 
 
-def make_env(args, idx, capture_video, run_name):
+def make_env(args, enc):
     def thunk():
-        if capture_video and idx == 0:
-            env = gym.make(args.env_id,
-                           render_mode="rgb_array",
-                           encoder_weight=args.enc,
-                           decoder_weight=args.dec,
-                           enable_inference=args.enable_inference,
-                           enable_empathy=args.enable_empathy,
-                           weight_empathy=args.weight_empathy)
-            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
-        else:
-            env = gym.make(args.env_id,
-                           size=5,
-                           encoder_weight=args.enc,
-                           decoder_weight=args.dec,
-                           enable_inference=args.enable_inference,
-                           enable_empathy=args.enable_empathy,
-                           weight_empathy=args.weight_empathy)
-
-        env = GridRoomsWrapper(env)
-        env = gym.wrappers.RecordEpisodeStatistics(env)
+        env = FoodShareDecoderLearningEnv(
+            decoding_mode=args.decoding_mode,
+            dim_emotional_feature=args.dim_emotional_feature,
+            emotional_encoder=enc,
+            weight_empathy=args.weight_empathy
+        )
+        env = RecordEpisodeStatisticsDecoderLearning(env)
         return env
 
     return thunk
@@ -129,7 +123,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class Agent(nn.Module):
-    def __init__(self, envs, with_empathy_channel):
+    def __init__(self, envs):
         super().__init__()
 
         x_in = envs.single_observation_space.shape[0]
@@ -180,7 +174,34 @@ class Agent(nn.Module):
         return action, probs.log_prob(action), probs.entropy(), self.critic(hidden), lstm_state
 
 
-def test_runs(agent: torch.nn.Module, test_envs: gym.vector.SyncVectorEnv, device):
+class EmotionalEncoder(torch.nn.Module):
+    def __init__(self, args: Args):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(1, args.hidden_size_decoder),
+            nn.ReLU(inplace=True),
+            nn.Linear(args.hidden_size_decoder, args.dim_emotional_feature),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class EmotionalDecoder(torch.nn.Module):
+    def __init__(self, args: Args):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(args.dim_emotional_feature, args.hidden_size_decoder),
+            nn.ReLU(inplace=True),
+            nn.Linear(args.hidden_size_decoder, 1),
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
+def test_runs(agent: torch.nn.Module, test_envs: SyncVectorDecoderLearningEnv, device, emotional_decoder):
     agent.eval()
 
     episode_length = 0.0
@@ -188,7 +209,7 @@ def test_runs(agent: torch.nn.Module, test_envs: gym.vector.SyncVectorEnv, devic
 
     not_done_flags = {i: True for i in range(n_runs)}
 
-    next_obs, _ = test_envs.reset(seed=args.seed)
+    next_obs, _ = test_envs.reset(seed=args.seed, emotional_decoder=emotional_decoder)
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_test_envs).to(device)
     next_lstm_state = (
@@ -201,7 +222,7 @@ def test_runs(agent: torch.nn.Module, test_envs: gym.vector.SyncVectorEnv, devic
         with torch.no_grad():
             action, _, _, _, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state, next_done)
 
-        next_obs, reward, next_done, truncations, infos = test_envs.step(action.cpu().numpy())
+        next_obs, reward, next_done, truncations, infos = test_envs.step(action.cpu().numpy(), emotional_decoder=emotional_decoder)
         next_done = np.logical_or(next_done, truncations)
         next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
 
@@ -230,33 +251,30 @@ if __name__ == "__main__":
     args.num_iterations = args.total_timesteps // args.batch_size
 
     s = ""
-    if args.enable_empathy is True and args.weight_empathy > 0:
-        s += "full_empathy"
-        args.wandb_group_name += "/full"
-    elif args.enable_empathy is True and args.weight_empathy == 0:
-        s += "emp_cognitive"
-        args.wandb_group_name += "/cognitive"
-    elif args.enable_empathy is False and args.weight_empathy > 0:
-        s += "emp_affective"
-        args.wandb_group_name += "/affect"
-    elif args.enable_empathy is False and args.weight_empathy == 0:
-        s += "no_empathy"
-        args.wandb_group_name += "/no"
+    if args.decoding_mode == "full":
+        s += "full_inference"
+        args.wandb_group_name += "/full_inference"
+    elif args.decoding_mode == "affect":
+        s += "affect_inference"
+        args.wandb_group_name += "/affect_inference"
+    else:
+        raise ValueError(f"invalid mode: {args.decoding_mode}")
 
-    s += "_inference"
-    args.wandb_group_name += "_infer"
+    if args.enable_learning:
+        s += "-learn"
+        args.wandb_group_name += "-learn"
+    else:
+        s += "-no_learn"
+        args.wandb_group_name += "-no_learn"
 
     run_name = f"{args.env_id}__{args.exp_name}_{s}_{args.seed}__{int(time.time())}"
 
     # encoder and decoder settings
-    enc = np.random.randn(args.dim_emotional_feature)
-    enc = enc / np.linalg.norm(enc)  # normalized feature
+    enc = EmotionalEncoder(args)
+    enc.eval()
 
-    dec = np.random.randn(args.dim_emotional_feature)
-    dec = dec / np.linalg.norm(dec)  # normalized feature
-
-    print(f"cosine similarity {args.seed}: ", np.dot(enc, dec))
-    args.cos_sim = np.dot(enc, dec)
+    dec = EmotionalDecoder(args)
+    dec.train()
 
     if args.track:
         import wandb
@@ -286,20 +304,17 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    args.enc = enc
-    args.dec = dec
-
     # env setup
-    envs = gym.vector.SyncVectorEnv(
-        [make_env(args, i, args.capture_video, run_name) for i in range(args.num_envs)],
+    envs = SyncVectorDecoderLearningEnv(
+        [make_env(args, enc) for i in range(args.num_envs)],
     )
-    test_envs = gym.vector.SyncVectorEnv(
-        [make_env(args, i, args.capture_video, run_name) for i in range(args.num_test_envs)],
+    test_envs = SyncVectorDecoderLearningEnv(
+        [make_env(args, enc) for i in range(args.num_test_envs)],
     )
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
-    agent = Agent(envs, args.enable_empathy).to(device)
-    optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
+    agent = Agent(envs).to(device)
+    optimizer = optim.Adam(list(agent.parameters()) + list(dec.parameters()), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
     obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(device)
@@ -312,7 +327,7 @@ if __name__ == "__main__":
     # TRY NOT TO MODIFY: start the game
     global_step = 0
     start_time = time.time()
-    next_obs, _ = envs.reset(seed=args.seed)
+    next_obs, _ = envs.reset(seed=args.seed, emotional_decoder=dec)
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
     next_lstm_state = (
@@ -322,8 +337,7 @@ if __name__ == "__main__":
 
     for iteration in range(1, args.num_iterations + 1):
         # test
-        test_length = test_runs(agent, test_envs, device=device)
-        # writer.add_scalar("test/episodic_error", test_error, global_step)
+        test_length = test_runs(agent, test_envs, device=device, emotional_decoder=dec)
         writer.add_scalar("test/episodic_length", test_length, global_step)
 
         # training
@@ -342,13 +356,15 @@ if __name__ == "__main__":
 
             # ALGO LOGIC: action logic
             with torch.no_grad():
-                action, logprob, _, value, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state, next_done)
+                action, logprob, _, value, next_lstm_state = agent.get_action_and_value(next_obs, next_lstm_state,
+                                                                                        next_done)
                 values[step] = value.flatten()
             actions[step] = action
             logprobs[step] = logprob
 
             # TRY NOT TO MODIFY: execute the game and log data.
-            next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
+            with torch.no_grad():
+                next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy(), emotional_decoder=dec)
             next_done = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
@@ -442,7 +458,15 @@ if __name__ == "__main__":
                     v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
 
                 entropy_loss = entropy.mean()
-                loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
+                loss_ppo = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
+
+                # Interoception self-reconstruction loss
+                b_energy = b_obs[:, 0].reshape(-1, 1)
+                b_emotional_feature = enc(b_energy).detach()
+                b_pred_energy = dec(b_emotional_feature)
+                loss_self = nn.functional.mse_loss(b_pred_energy, b_energy)
+
+                loss = loss_ppo + float(args.enable_learning) * loss_self
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -465,29 +489,32 @@ if __name__ == "__main__":
         writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
+        writer.add_scalar("losses/self_interoception_loss", loss_self, global_step)
         print("SPS:", int(global_step / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
     envs.close()
 
     os.makedirs("models", exist_ok=True)
-    s = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     p = f"models_inference/{args.env_id.split('/')[1]}"
     os.makedirs(p, exist_ok=True)
-    if args.enable_empathy is True and args.weight_empathy > 0:
-        PATH = p + f"/full-{s}"
-    elif args.enable_empathy is True and args.weight_empathy == 0:
-        PATH = p + f"/cognitive-{s}"
-    elif args.enable_empathy is False and args.weight_empathy > 0:
-        PATH = p + f"/affective-{s}"
-    elif args.enable_empathy is False and args.weight_empathy == 0:
-        PATH = p + f"/no-{s}"
+
+    s = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    if args.enable_learning:
+        s += "-learn"
     else:
-        raise ValueError(f"invalid setting : {(args.enable_empathy, args.weight_empathy)}")
+        s += "-no_learn"
+    if args.decoding_mode == "full":
+        PATH = p + f"/full_inference-{s}"
+    elif args.decoding_mode == "affect":
+        PATH = p + f"/affective_inference-{s}"
+
+    else:
+        raise ValueError(f"invalid mode: {args.decoding_mode}")
 
     os.makedirs(PATH, exist_ok=True)
-    np.save(PATH + f"/enc.npy", args.enc)
-    np.save(PATH + f"/dec.npy", args.dec)
+    torch.save(enc, PATH + "/emotional_encoder.pt")
+    torch.save(dec, PATH + "/emotional_decoder.pt")
     torch.save(agent.state_dict(), PATH + "/model.pt")
 
     writer.close()
