@@ -270,7 +270,7 @@ if __name__ == "__main__":
         s += "-no_learn"
         args.wandb_group_name += "-no_learn"
 
-    if args.enable_empathy is F:
+    if args.enable_empathy is False:
         s += "-a"
         args.wandb_group_name += "-a"
 
