@@ -82,8 +82,10 @@ class Args:
     target_kl: float = None
     """the target KL divergence threshold"""
 
+    enable_empathy: bool = False
+    """if toggled, enable cognitive empathy """
     enable_learning: bool = False
-    "if toggled, enable decoder learning"
+    """if toggled, enable decoder learning"""
     decoding_mode: str = "full"
     """ decoding mode; full or affect"""
     weight_empathy: float = 0.5
@@ -105,6 +107,7 @@ class Args:
 def make_env(args, enc):
     def thunk():
         env = FoodShareDecoderLearningEnv(
+            enable_empathy=args.enable_empathy,
             decoding_mode=args.decoding_mode,
             dim_emotional_feature=args.dim_emotional_feature,
             emotional_encoder=enc,
@@ -266,6 +269,10 @@ if __name__ == "__main__":
     else:
         s += "-no_learn"
         args.wandb_group_name += "-no_learn"
+
+    if args.enable_empathy is F:
+        s += "-a"
+        args.wandb_group_name += "-a"
 
     run_name = f"{args.env_id}__{args.exp_name}_{s}_{args.seed}__{int(time.time())}"
 
@@ -500,10 +507,15 @@ if __name__ == "__main__":
     os.makedirs(p, exist_ok=True)
 
     s = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+
     if args.enable_learning:
         s += "-learn"
     else:
         s += "-no_learn"
+
+    if args.enable_empathy is False:
+        s += "-a"
+
     if args.decoding_mode == "full":
         PATH = p + f"/full_inference-{s}"
     elif args.decoding_mode == "affect":

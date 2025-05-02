@@ -78,7 +78,9 @@ class Args:
     """the target KL divergence threshold"""
 
     enable_empathy: bool = False
+    """ toggle cognitive empathy """
     weight_empathy: float = 0.0
+    """ affective empathy """
     FSR: float = 1.0  # feed success rate
 
     # to be filled in runtime
