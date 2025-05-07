@@ -268,6 +268,9 @@ if __name__ == "__main__":
     if args.enable_empathy is False:
         s += "-a"
         args.wandb_group_name += "-a"
+    if args.weight_empathy == 0.0:
+        s += "-c"
+        args.wandb_group_name += "-c"
 
     run_name = f"{args.env_id}__{args.exp_name}_{s}_{args.seed}__{int(time.time())}"
 
@@ -505,6 +508,8 @@ if __name__ == "__main__":
         s += "-no_learn"
     if args.enable_empathy is False:
         s += "-a"
+    if args.weight_empathy == 0.0:
+        s += "-c"
 
     if args.decoding_mode == "full":
         PATH = p + f"/full_inference-{s}"
