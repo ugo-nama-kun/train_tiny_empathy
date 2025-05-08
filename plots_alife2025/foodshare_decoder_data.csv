@@ -1,0 +1,11 @@
+group,mean,ci
+full_inference-learn-c,213.3,267.9674652537623
+affect_inference-learn-c,13.5,2.7295937619475827
+full_inference-no_learn-c,16.9,3.8704286720288694
+affect_inference-no_learn-c,14.35,2.9869911282091213
+affect_inference-learn-a,1705.15,316.6838701727306
+affect_inference-no_learn-a,16.9,5.3674927205598655
+full_inference-learn,1802.85,267.30073200955155
+affect_inference-learn,1207.1,437.2175969868406
+full_inference-no_learn,17.7,3.3742094278746086
+affect_inference-no_learn,16.7,5.916165970413075
