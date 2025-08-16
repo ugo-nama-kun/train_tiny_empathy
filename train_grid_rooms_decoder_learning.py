@@ -85,6 +85,8 @@ class Args:
     """if toggled, enable decoder learning"""
     decoding_mode: str = "full"
     """ decoding mode; full or affect"""
+    # full: decode the interoception of other and use it as obs and reward (type-B)
+    # affect: decode the interoception of other and use it for only reward (type-A)
     weight_empathy: float = 0.5
     """ affective empathy weight """
     dim_emotional_feature: int = 5
